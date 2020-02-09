@@ -1,133 +1,129 @@
-"use strict";
+/* Needed gulp config */
 
-// Load plugins
-const autoprefixer = require("gulp-autoprefixer");
-const browsersync = require("browser-sync").create();
-const cleanCSS = require("gulp-clean-css");
-const del = require("del");
-const gulp = require("gulp");
-const header = require("gulp-header");
-const merge = require("merge-stream");
-const plumber = require("gulp-plumber");
-const rename = require("gulp-rename");
-const sass = require("gulp-sass");
-const uglify = require("gulp-uglify");
+var gulp = require('gulp');  
+var sass = require('gulp-sass');
+var uglify = require('gulp-uglify');
+var rename = require('gulp-rename');
+var notify = require('gulp-notify');
+var minifycss = require('gulp-minify-css');
+var concat = require('gulp-concat');
+var plumber = require('gulp-plumber');
+var browserSync = require('browser-sync');
+var reload = browserSync.reload;
+const sourcemaps = require('gulp-sourcemaps');
+const autoprefixer = require('gulp-autoprefixer');
 
-// Load package.json for banner
-const pkg = require('./package.json');
+/* Setup scss path */
+var paths = {
+    scss: './sass/*.scss'
+};
 
-// Set the banner content
-const banner = ['/*!\n',
-  ' * Start Bootstrap - <%= pkg.title %> v<%= pkg.version %> (<%= pkg.homepage %>)\n',
-  ' * Copyright 2013-' + (new Date()).getFullYear(), ' <%= pkg.author %>\n',
-  ' * Licensed under <%= pkg.license %> (https://github.com/BlackrockDigital/<%= pkg.name %>/blob/master/LICENSE)\n',
-  ' */\n',
-  '\n'
-].join('');
-
-// BrowserSync
-function browserSync(done) {
-  browsersync.init({
-    server: {
-      baseDir: "./"
-    },
-    port: 3000
-  });
-  done();
-}
-
-// BrowserSync reload
-function browserSyncReload(done) {
-  browsersync.reload();
-  done();
-}
-
-// Clean vendor
-function clean() {
-  return del(["./vendor/"]);
-}
-
-// Bring third party dependencies from node_modules into vendor directory
-function modules() {
-  // Bootstrap
-  var bootstrap = gulp.src('./node_modules/bootstrap/dist/**/*')
-    .pipe(gulp.dest('./vendor/bootstrap'));
-  // Font Awesome CSS
-  var fontAwesomeCSS = gulp.src('./node_modules/@fortawesome/fontawesome-free/css/**/*')
-    .pipe(gulp.dest('./vendor/fontawesome-free/css'));
-  // Font Awesome Webfonts
-  var fontAwesomeWebfonts = gulp.src('./node_modules/@fortawesome/fontawesome-free/webfonts/**/*')
-    .pipe(gulp.dest('./vendor/fontawesome-free/webfonts'));
-  // jQuery
-  var jquery = gulp.src([
-      './node_modules/jquery/dist/*',
-      '!./node_modules/jquery/dist/core.js'
+/* Scripts task */
+gulp.task('scripts', function() {
+  return gulp.src([
+    /* Add your JS files here, they will be combined in this order */
+    'js/vendor/jquery.min.js',
+    'js/vendor/jquery.easing.1.3.js',
+    'js/vendor/jquery.stellar.min.js',
+    'js/vendor/jquery.flexslider-min.js',
+    'js/vendor/bootstrap.min.js',
+    'js/vendor/jquery.waypoints.min.js',
+    'js/vendor/jquery.magnific-popup.min.js',
+    'js/vendor/simplyCountdown.min.js',
     ])
-    .pipe(gulp.dest('./vendor/jquery'));
-  return merge(bootstrap, fontAwesomeCSS, fontAwesomeWebfonts, jquery);
-}
+    .pipe(concat('scripts.js'))
+    .pipe(gulp.dest('js'))
+    .pipe(rename({suffix: '.min'}))
+    .pipe(uglify())
+    .pipe(gulp.dest('js'));
+});
 
-// CSS task
-function css() {
-  return gulp
-    .src("./scss/**/*.scss")
+gulp.task('minify-custom', function() {
+  return gulp.src([
+    /* Add your JS files here, they will be combined in this order */
+    'js/custom.js'
+    ])
+    .pipe(rename({suffix: '.min'}))
+    .pipe(uglify())
+    .pipe(gulp.dest('js'));
+});
+
+/* Sass task */
+gulp.task('sass', function () {  
+    gulp.src('scss/style.scss')
     .pipe(plumber())
     .pipe(sass({
-      outputStyle: "expanded",
-      includePaths: "./node_modules",
+      errLogToConsole: true,
+
+      //outputStyle: 'compressed',
+      // outputStyle: 'compact',
+      // outputStyle: 'nested',
+      outputStyle: 'expanded',
+      precision: 10
     }))
-    .on("error", sass.logError)
+
+    .pipe(sourcemaps.init())
     .pipe(autoprefixer({
-      browsers: ['last 2 versions'],
-      cascade: false
+        browsers: ['last 2 versions'],
+        cascade: false
     }))
-    .pipe(header(banner, {
-      pkg: pkg
-    }))
-    .pipe(gulp.dest("./css"))
-    .pipe(rename({
-      suffix: ".min"
-    }))
-    .pipe(cleanCSS())
-    .pipe(gulp.dest("./css"))
-    .pipe(browsersync.stream());
-}
+    .pipe(gulp.dest('css'))
 
-// JS task
-function js() {
-  return gulp
-    .src([
-      './js/*.js',
-      '!./js/*.min.js'
-    ])
-    .pipe(uglify())
-    .pipe(header(banner, {
-      pkg: pkg
-    }))
-    .pipe(rename({
-      suffix: '.min'
-    }))
-    .pipe(gulp.dest('./js'))
-    .pipe(browsersync.stream());
-}
+    .pipe(rename({suffix: '.min'}))
+    .pipe(minifycss())
+    .pipe(gulp.dest('css'))
+    /* Reload the browser CSS after every change */
+    .pipe(reload({stream:true}));
+});
 
-// Watch files
-function watchFiles() {
-  gulp.watch("./scss/**/*", css);
-  gulp.watch(["./js/**/*", "!./js/**/*.min.js"], js);
-  gulp.watch("./**/*.html", browserSyncReload);
-}
+gulp.task('merge-styles', function () {
 
-// Define complex tasks
-const vendor = gulp.series(clean, modules);
-const build = gulp.series(vendor, gulp.parallel(css, js));
-const watch = gulp.series(build, gulp.parallel(watchFiles, browserSync));
+    return gulp.src([
+        'css/vendor/bootstrap.min.css',
+        'css/vendor/animate.css',
+        'css/vendor/magnific-popup.css',
+        'css/vendor/flexslider.css',
+        'fonts/icomoon/style.css',
+        ])
+        // .pipe(sourcemaps.init())
+        // .pipe(autoprefixer({
+        //     browsers: ['last 2 versions'],
+        //     cascade: false
+        // }))
+        .pipe(concat('styles-merged.css'))
+        .pipe(gulp.dest('css'))
+        // .pipe(rename({suffix: '.min'}))
+        // .pipe(minifycss())
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest('css'))
+        .pipe(reload({stream:true}));
+});
 
-// Export tasks
-exports.css = css;
-exports.js = js;
-exports.clean = clean;
-exports.vendor = vendor;
-exports.build = build;
-exports.watch = watch;
-exports.default = build;
+/* Reload task */
+gulp.task('bs-reload', function () {
+    browserSync.reload();
+});
+
+/* Prepare Browser-sync for localhost */
+gulp.task('browser-sync', function() {
+    browserSync.init(['css/*.css', 'js/*.js'], {
+        
+        proxy: 'localhost/probootstrap/wedding'
+        /* For a static server you would use this: */
+        /*
+        server: {
+            baseDir: './'
+        }
+        */
+    });
+});
+
+/* Watch scss, js and html files, doing different things with each. */
+gulp.task('default', ['sass', 'scripts', 'browser-sync'], function () {
+    /* Watch scss, run the sass task on change. */
+    gulp.watch(['scss/*.scss', 'scss/**/*.scss'], ['sass'])
+    /* Watch app.js file, run the scripts task on change. */
+    gulp.watch(['js/custom.js'], ['minify-custom'])
+    /* Watch .html files, run the bs-reload task on change. */
+    gulp.watch(['*.html'], ['bs-reload']);
+});
